@@ -1,128 +1,125 @@
-# Monte Carlo & ML Option Pricing
+# Core 4 — In-Memory Acceleration of Monte Carlo and ML-Based Financial Workloads
 
-Part of **Core 4**'s Chips & AI Hackathon project: *In-Memory Acceleration of Monte Carlo and
-ML-Based Financial Workloads* (Theme 4 — In-Memory Computing and Circuits).
+**Team:** Nini Hsu · Rupsaa Goswami · Raya Chauhan · Ishika Pandurangam (collaborative — no task is
+exclusive to one person; the roles below are starting points, not fixed assignments)
+**Theme:** 4 — In-Memory Computing and Circuits
+**Final demo video due:** Sep 19, 2026
 
-This repo is the Monte Carlo pricing and dataset-generation component, owned by **Nini Hsu**.
-It produces the synthetic training dataset that feeds the neural-network surrogate (Rupsaa) and,
-downstream, the IMC mapping analysis (Raya).
+## Problem & Motivation
 
-## What's in here
+We want to make computationally intensive financial models more efficient in data movement,
+latency, energy consumption, and (possibly) throughput — while maintaining pricing accuracy.
+We use European call option pricing as the example workload, compare a traditional Monte Carlo
+approach against a small neural-network surrogate, then model how the neural network's
+matrix-vector computations could map onto an in-memory (IMC) / near-memory computing
+architecture.
 
-| File | Description |
+**Note:** this project does *not* predict real stock prices (e.g. Apple, NVIDIA). The dataset is
+synthetic, hypothetical European call-option scenarios, chosen to keep the focus on computational
+workload acceleration rather than stock forecasting.
+
+## Pipeline
+
+```
+Synthetic Option Scenarios → Monte Carlo Pricing → Training Dataset
+    → Neural-Network Surrogate → IMC Mapping → Performance Comparison
+```
+
+## Current Status (as of Sep 11, 2026)
+
+| Component | Status |
 |---|---|
-| `monte_carlo.py` | Reusable module: single-scenario pricer + batched dataset generator (docstrings included) |
-| `monte_carlo.ipynb` | Notebook that runs the generator and prints a validation check |
-| `core4_mc_dataset_10000.csv` | Generated dataset: 10,000 synthetic European call scenarios with Monte Carlo prices |
-| `requirements.txt` | Dependencies |
+| Monte Carlo pricer + dataset | Done — 10,000-scenario dataset generated, validated against Black-Scholes (~0.12% error) |
+| Neural-network surrogate | In progress |
+| IMC mapping | In progress |
+| Benchmarking & comparison | Schema in progress; final numbers arrive as MC/NN/IMC results land |
 
-## Method
-
-Terminal stock price simulated under risk-neutral geometric Brownian motion:
+## Repo Structure
 
 ```
-S_T = S · exp[(r − ½σ²)T + σ√T · Z],   Z ~ N(0,1)
+core4-project/
+├── monte_carlo/       # MC pricer, Black-Scholes validation, dataset generation
+├── neural_network/     # NN preprocessing, training, evaluation
+├── imc_mapping/        # IMC modeling, MAC counts, latency/energy estimates
+├── benchmarking/        # benchmark schema, comparison tables, plots
+├── data/               # Shared CSV datasets (dummy + final)
+├── results/             # Final tables, figures, frozen results
+└── docs/                # Project plan, proposal, schedule, completion plan
 ```
 
-European call payoff and Monte Carlo price estimate:
+## Dataset Spec
+
+Each row = one hypothetical European call option.
+
+| Column | Meaning | Initial Range | Role |
+|---|---|---|---|
+| S | Current underlying price | $50–$200 | NN input |
+| K | Strike price | covers moneyness 0.7–1.3 | NN input |
+| T | Time to expiration (yrs) | 0.05–2.0 | NN input |
+| sigma | Annualized volatility | 0.10–0.60 | NN input |
+| r | Risk-free rate | 0.00–0.08 | NN input |
+| mc_price | Monte Carlo call price | calculated | target |
+
+Metadata columns (not NN inputs): `moneyness`, `num_paths`, `mc_runtime_ms`.
+
+CSV header:
+```
+S,K,T,sigma,r,mc_price,moneyness,num_paths,mc_runtime_ms
+```
+
+Dev dataset: 500–1,000 rows. Final target: ~20,000–100,000 scenarios.
+
+## Monte Carlo Reference Model
+
+GBM terminal price:
+```
+S_T = S * exp[(r - 0.5*sigma^2)*T + sigma*sqrt(T)*Z],   Z ~ N(0,1)
+```
+Payoff: `max(S_T - K, 0)`
+Price estimate: `C_MC = exp(-r*T) * average(payoff)`
+
+**Validation case:** S=100, K=100, T=1, sigma=0.20, r=0.05 → should approach Black-Scholes ≈ $10.45.
+
+## Common Result Table Schema
 
 ```
-Payoff = max(S_T − K, 0)
-C_MC = exp(−rT) · average[Payoff]
+method,mae,rmse,r2,latency_ms,throughput,data_movement_bytes,energy_estimate
 ```
 
-## Validation
+## Open Tasks (not assigned to one person — pick up whatever's open)
 
-Test case: **S=100, K=100, T=1, σ=0.20, r=0.05**, priced with 200,000 Monte Carlo paths.
+- **Monte Carlo** — pricer + BS validation + dataset generation: **done**, open to refinement (e.g. expanding dataset, edge-case validation)
+- **Neural network** — pipeline (start 5→64→64→1), training, MAE/RMSE/R-squared/latency/size metrics
+- **IMC mapping** — modeling approach, MAC counts, data movement, latency/energy estimates
+- **Benchmarking** — schema, results aggregation, plots, final comparison + demo coordination
 
-| | Price |
+See `docs/core4_completion_plan.pdf` for the full milestone-based plan and a detailed,
+non-exclusive repo blueprint.
+
+## Key Dependencies
+
+```
+MC + dataset ───────────────→ NN training
+Agreed NN architecture ───→ IMC mapping
+MC + NN + IMC results ─────→ Final comparison
+```
+
+## Hard Deadlines
+
+| Date | Milestone |
 |---|---|
-| Black-Scholes closed form | $10.4506 |
-| Monte Carlo (this implementation) | $10.4634 |
-| Relative error | ~0.12% |
+| Sep 13 | End-to-end pipeline works |
+| Sep 16 | Results frozen |
+| Sep 18 | Demo video finished |
+| Sep 19 | Submit |
 
-This is within expected Monte Carlo sampling noise at 200k paths and confirms the simulation is
-implemented correctly before generating the full dataset.
+## Scope Rules (MVP)
 
-## Dataset
+- European call options only
+- Synthetic scenarios, not historical stock prediction
+- One small NN before trying larger architectures
+- Software/simulation-based IMC — no physical chip required
+- No new features after Sep 16 unless critical
+- Real stock example is optional/demo-only, not the main dataset
 
-`generate_mc_dataset()` produces `core4_mc_dataset_10000.csv`: 10,000 scenarios, each priced with
-20,000 Monte Carlo paths, generated in ~4 seconds on a single machine (vectorized/batched in
-groups of 100 scenarios at a time).
-
-**Sampling:**
-
-```
-K          ~ Uniform(50, 200)
-moneyness  ~ Uniform(0.7, 1.3)      # S/K, so scenarios cover OTM, ATM, and ITM
-S          = K * moneyness
-T          ~ Uniform(0.05, 2.0)     # years
-sigma      ~ Uniform(0.10, 0.60)
-r          ~ Uniform(0.00, 0.08)
-```
-
-Note: S is *derived* from K and moneyness rather than sampled directly, so the actual S range
-ends up wider than a flat $50–$200 — in the generated dataset it's about **$36–$258**. This was a
-deliberate tradeoff to guarantee even coverage of moneyness (in-the-money vs out-of-the-money)
-rather than a fixed S range.
-
-**Output CSV columns:**
-
-```
-scenario_id,S,K,T,sigma,r,moneyness,num_paths,mc_runtime_ms,mc_price
-```
-
-**Actual ranges in the generated 10,000-row dataset:**
-
-| Column | Min | Max |
-|---|---|---|
-| S | 36.05 | 258.01 |
-| K | 50.00 | 199.94 |
-| moneyness | 0.700 | 1.300 |
-| T | 0.050 | 2.000 |
-| sigma | 0.100 | 0.600 |
-| r | 0.00001 | 0.080 |
-| mc_price | 0.00 | 108.48 |
-
-`mc_runtime_ms` is the *average* per-scenario cost within its batch (batch wall-clock time ÷
-batch size — here batches of 100 scenarios average **~0.36 ms/scenario** at 20,000 paths each),
-not an individually measured time per scenario. Batches are priced as one vectorized NumPy
-operation, so true per-scenario timing isn't meaningful at that granularity — the batch average
-is the fair number to use for throughput comparisons downstream.
-
-## Reproducibility
-
-Both the scenario sampling and the Monte Carlo path simulation use fixed seeds
-(`scenario_seed=20260909`, `mc_seed=12345` for the dataset; `seed=42` for the single-scenario
-validation test), so re-running `generate_mc_dataset()` reproduces the exact same CSV.
-
-## Usage
-
-```bash
-pip install -r requirements.txt
-
-# Regenerate the dataset + run the validation check
-python monte_carlo.py
-
-# Or import the functions directly
-python -c "
-from monte_carlo import monte_carlo_call_price
-print(monte_carlo_call_price(S=100, K=100, T=1, sigma=0.20, r=0.05, num_paths=200_000))
-"
-```
-
-The notebook (`monte_carlo.ipynb`) runs the same code interactively.
-
-## Handoff
-
-`core4_mc_dataset_10000.csv` is the agreed dataset format passed to the neural-network surrogate
-for training (`S, K, T, sigma, r` as inputs, `mc_price` as the training target), and ultimately
-feeds the IMC mapping and final benchmarking/comparison stages of the Core 4 pipeline.
-
-## Requirements
-
-```
-numpy
-pandas
-jupyter
-```
+See `docs/` for the full project plan, one-page proposal, materials checklist, and completion plan.

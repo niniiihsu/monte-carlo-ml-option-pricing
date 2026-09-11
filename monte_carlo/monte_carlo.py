@@ -2,7 +2,8 @@
 Monte Carlo European call option pricing and synthetic dataset generation.
 
 Core 4 - Chips & AI Hackathon
-Component owner: Nini Hsu
+Contributors: Nini Hsu (Monte Carlo pricer, dataset generation),
+Ishika Pandurangam (module refactor, documentation)
 
 This module implements:
     1. A single-scenario Monte Carlo European call pricer
