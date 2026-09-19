@@ -1,0 +1,3 @@
+method,mae,rmse,r2,latency_ms,throughput,data_movement_bytes,energy_estimate
+neural_network_conventional_datamovement,,,,0.002245,445386.7,19484,2971.6780
+neural_network_imc,,,,0.000901,1109582.4,1048,5.7900
